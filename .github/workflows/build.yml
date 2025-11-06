@@ -55,7 +55,7 @@ jobs:
           -DLLVM_DEFAULT_TARGET_TRIPLE=aarch64-w64-mingw32 \
           -DCMAKE_C_COMPILER=clang-19 \
           -DCMAKE_CXX_COMPILER=clang++-19 \
-          -DCMAKE_SYSTEM_NAME=Windows \
+          -DCMAKE_SYSTEM_NAME=Generic \
           -DCMAKE_CROSSCOMPILING=True \
           -DLLVM_TABLEGEN=/usr/lib/llvm-19/bin/llvm-tblgen \
           -DCLANG_TABLEGEN=/usr/lib/llvm-19/bin/clang-tblgen \
