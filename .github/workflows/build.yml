@@ -28,12 +28,15 @@ jobs:
           base-devel
           mingw-w64-x86_64-gcc-ada
           mingw-w64-x86_64-gprbuild
-          mingw-w64-x86_64-llvm
-          mingw-w64-x86_64-clang
 
     - name: Clone GCC Ada sources
       shell: msys2 {0}
       run: |
+        pacman -U https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-llvm-19.1.7-1-any.pkg.tar.zst \
+                  https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-llvm-libs-19.1.7-1-any.pkg.tar.zst \
+                  https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-clang-19.1.7-1-any.pkg.tar.zst \
+                  https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-clang-libs-19.1.7-1-any.pkg.tar.zst
+                         
         cd gnat-llvm
         git clone git://gcc.gnu.org/git/gcc.git llvm-interface/gcc --single-branch --depth=1
         ln -s gcc/gcc/ada llvm-interface/gnat_src
