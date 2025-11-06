@@ -29,8 +29,6 @@ jobs:
     - name: Install cross LLVM/Clang for AArch64 Windows
       run: |
         sudo apt install -y clang-19 llvm-19-dev \
-          binutils-aarch64-linux-gnu \
-          gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
 
     - name: Clone GCC sources (Ada frontend)
       run: |
@@ -43,12 +41,6 @@ jobs:
         cd gnat-llvm
         git clone https://github.com/AdaCore/llvm-bindings.git
 
-    - name: Configure environment for cross-compilation
-      run: |
-        echo "CROSS_PREFIX=aarch64-w64-mingw32" >> $GITHUB_ENV
-        echo "LLVM_TARGET=AArch64" >> $GITHUB_ENV
-        echo "CLANG_TARGET_TRIPLE=aarch64-w64-mingw32" >> $GITHUB_ENV
-
     - name: Build LLVM with MinGW target enabled
       run: |
         cd gnat-llvm
@@ -58,8 +50,8 @@ jobs:
           -DLLVM_ENABLE_PROJECTS="clang" \
           -DLLVM_TARGETS_TO_BUILD="AArch64;X86" \
           -DLLVM_DEFAULT_TARGET_TRIPLE=aarch64-w64-mingw32 \
-          -DCMAKE_C_COMPILER=aarch64-w64-mingw32-gcc \
-          -DCMAKE_CXX_COMPILER=aarch64-w64-mingw32-g++ \
+          -DCMAKE_C_COMPILER=clang-19 \
+          -DCMAKE_CXX_COMPILER=clang++-19 \
           -DCMAKE_SYSTEM_NAME=Windows \
           -DCMAKE_CROSSCOMPILING=True \
           -DLLVM_TABLEGEN=/usr/lib/llvm-19/bin/llvm-tblgen \
@@ -77,9 +69,7 @@ jobs:
         if [ -f llvm/patches/LLVMStructTBAAPatch.diff ]; then
           patch -p1 -d llvm-build/lib/Analysis < llvm/patches/LLVMStructTBAAPatch.diff || true
         fi
-        make CROSS_PREFIX=aarch64-w64-mingw32 \
-             TARGET=aarch64-w64-mingw32 \
-             GNATMAKEFLAGS="--target=aarch64-w64-mingw32"
+        make
 
     - name: Package cross-compiler for Windows AArch64
       run: |
