@@ -1,4 +1,4 @@
-name: Build GNAT LLVM for AArch64 Windows MinGW Cross-Compile
+name: Cross-compile GNAT LLVM for AArch64 Windows MinGW
 
 on:
   push:
@@ -7,8 +7,10 @@ on:
     branches: [ main ]
 
 jobs:
-  build:
+  cross-build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
     - name: Checkout GNAT LLVM
@@ -17,12 +19,20 @@ jobs:
         repository: AdaCore/gnat-llvm
         path: gnat-llvm
 
-    - name: Install dependencies
+    - name: Install native build tools
       run: |
         sudo apt update
-        sudo apt install -y git make cmake gnat-11 g++-11 python3 zlib1g-dev libmpfr-dev libgmp-dev libmpc-dev
+        sudo apt install -y git make cmake gnat-11 g++-11 \
+          python3 zlib1g-dev libmpfr-dev libgmp-dev libmpc-dev \
+          mingw-w64 mingw-w64-tools
 
-    - name: Clone GCC Ada sources
+    - name: Install cross LLVM/Clang for AArch64 Windows
+      run: |
+        sudo apt install -y clang-19 llvm-19-dev \
+          binutils-aarch64-linux-gnu \
+          gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+
+    - name: Clone GCC sources (Ada frontend)
       run: |
         cd gnat-llvm
         git clone git://gcc.gnu.org/git/gcc.git llvm-interface/gcc --single-branch --depth=1
@@ -33,29 +43,73 @@ jobs:
         cd gnat-llvm
         git clone https://github.com/AdaCore/llvm-bindings.git
 
-    - name: Build LLVM from source
+    - name: Configure environment for cross-compilation
+      run: |
+        echo "CROSS_PREFIX=aarch64-w64-mingw32" >> $GITHUB_ENV
+        echo "LLVM_TARGET=AArch64" >> $GITHUB_ENV
+        echo "CLANG_TARGET_TRIPLE=aarch64-w64-mingw32" >> $GITHUB_ENV
+
+    - name: Build LLVM with MinGW target enabled
       run: |
         cd gnat-llvm
-        make llvm
+        mkdir -p llvm-build && cd llvm-build
+        cmake -G "Unix Makefiles" \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DLLVM_ENABLE_PROJECTS="clang" \
+          -DLLVM_TARGETS_TO_BUILD="AArch64;X86" \
+          -DLLVM_DEFAULT_TARGET_TRIPLE=aarch64-w64-mingw32 \
+          -DCMAKE_C_COMPILER=aarch64-w64-mingw32-gcc \
+          -DCMAKE_CXX_COMPILER=aarch64-w64-mingw32-g++ \
+          -DCMAKE_SYSTEM_NAME=Windows \
+          -DCMAKE_CROSSCOMPILING=True \
+          -DLLVM_TABLEGEN=/usr/lib/llvm-19/bin/llvm-tblgen \
+          -DCLANG_TABLEGEN=/usr/lib/llvm-19/bin/clang-tblgen \
+          ../llvm-project/llvm
+        make -j$(nproc) clang llvm-config llc opt
 
-    - name: Build GNAT LLVM
+    - name: Patch and build GNAT LLVM for cross
       run: |
         cd gnat-llvm
-        make
+        # Use built LLVM
+        export PATH=$PWD/llvm-build/bin:$PATH
+        export LLVM_CONFIG=$PWD/llvm-build/bin/llvm-config
+        # Apply known aliasing patch if needed
+        if [ -f llvm/patches/LLVMStructTBAAPatch.diff ]; then
+          patch -p1 -d llvm-build/lib/Analysis < llvm/patches/LLVMStructTBAAPatch.diff || true
+        fi
+        make CROSS_PREFIX=aarch64-w64-mingw32 \
+             TARGET=aarch64-w64-mingw32 \
+             GNATMAKEFLAGS="--target=aarch64-w64-mingw32"
 
-    - name: Test targeting AArch64 Windows MinGW
+    - name: Package cross-compiler for Windows AArch64
       run: |
         cd gnat-llvm
-        export PATH=$PWD/llvm-interface/bin:$PATH
-        echo 'procedure Main is begin null; end Main;' > main.adb
-        llvm-gcc -c -emit-llvm -target aarch64-w64-mingw32 main.adb -o main.bc
-        test -f main.bc && test -s main.bc && echo "Target test passed"
+        mkdir -p dist/gnat-llvm-aarch64-windows
+        cp -r llvm-interface/bin/* dist/gnat-llvm-aarch64-windows/ || true
+        cp -r llvm-interface/lib/* dist/gnat-llvm-aarch64-windows/ || true
+        cp llvm-build/bin/clang dist/gnat-llvm-aarch64-windows/
+        cp llvm-build/bin/llvm-config dist/gnat-llvm-aarch64-windows/
+        # Create wrapper script to run under Wine or native Windows
+        cat > dist/gnat-llvm-aarch64-windows/llvm-gcc <<'EOF'
+        #!/bin/bash
+        exec "$(dirname "$0")/clang" --target=aarch64-w64-mingw32 \
+          -integrated-as -c "$@"
+        EOF
+        chmod +x dist/gnat-llvm-aarch64-windows/llvm-gcc
 
-    - name: Upload build artifacts
+    - name: Test cross-compilation
+      run: |
+        cd gnat-llvm/dist/gnat-llvm-aarch64-windows
+        export PATH=$PWD:$PATH
+        echo 'with Ada.Text_IO; procedure Hello is begin Ada.Text_IO.Put_Line("Hello AArch64 Windows"); end Hello;' > hello.adb
+        llvm-gcc -c hello.adb
+        llvm-gcc -c -emit-llvm hello.adb -o hello.bc
+        file hello.o | grep "PE32+ executable (console) AArch64"
+        file hello.bc | grep "LLVM IR bitcode"
+
+    - name: Upload cross-compiler artifact
       uses: actions/upload-artifact@v4
       with:
-        name: gnat-llvm-build
-        path: |
-          gnat-llvm/llvm-interface/bin/*
-          gnat-llvm/llvm-interface/lib/*
-        retention-days: 7
+        name: gnat-llvm-aarch64-windows-mingw
+        path: gnat-llvm/dist/gnat-llvm-aarch64-windows/**
+        retention-days: 14
