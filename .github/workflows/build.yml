@@ -27,6 +27,7 @@ jobs:
           make
           base-devel
           mingw-w64-x86_64-gcc-ada
+          mingw-w64-x86_64-gprbuild
           mingw-w64-x86_64-llvm
           mingw-w64-x86_64-clang
 
@@ -36,6 +37,7 @@ jobs:
         cd gnat-llvm
         git clone git://gcc.gnu.org/git/gcc.git llvm-interface/gcc --single-branch --depth=1
         ln -s gcc/gcc/ada llvm-interface/gnat_src
+
     - name: Clone LLVM Ada bindings
       shell: msys2 {0}
       run: |
