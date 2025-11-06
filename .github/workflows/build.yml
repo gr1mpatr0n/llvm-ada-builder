@@ -28,7 +28,7 @@ jobs:
 
     - name: Install cross LLVM/Clang for AArch64 Windows
       run: |
-        sudo apt install -y clang-19 llvm-19-dev \
+        sudo apt install -y clang-19 clang-tools-19 llvm-19-dev
 
     - name: Clone GCC sources (Ada frontend)
       run: |
