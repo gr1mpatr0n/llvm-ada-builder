@@ -44,6 +44,9 @@ jobs:
     - name: Build LLVM with MinGW target enabled
       run: |
         cd gnat-llvm
+        if [ ! -d llvm-project ]; then
+          git clone --depth 1 -b llvmorg-19.1.7 https://github.com/llvm/llvm-project.git llvm-project
+        fi
         mkdir -p llvm-build && cd llvm-build
         cmake -G "Unix Makefiles" \
           -DCMAKE_BUILD_TYPE=Release \
