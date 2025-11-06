@@ -25,7 +25,7 @@ jobs:
     - name: Clone GCC Ada sources
       run: |
         cd gnat-llvm
-        git clone git://gcc.gnu.org/git/gcc.git llvm-interface/gcc
+        git clone git://gcc.gnu.org/git/gcc.git llvm-interface/gcc --single-branch --depth=1
         ln -s gcc/gcc/ada llvm-interface/gnat_src
 
     - name: Clone LLVM Ada bindings
