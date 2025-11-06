@@ -1,0 +1,68 @@
+name: Build GNAT LLVM for AArch64 Windows MinGW
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout GNAT LLVM
+      uses: actions/checkout@v4
+      with:
+        repository: AdaCore/gnat-llvm
+        path: gnat-llvm
+
+    - name: Setup MSYS2
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: true
+        install: >-
+          git
+          make
+          base-devel
+          mingw-w64-x86_64-gcc-ada
+          mingw-w64-x86_64-llvm
+          mingw-w64-x86_64-clang
+
+    - name: Clone GCC Ada sources
+      shell: msys2 {0}
+      run: |
+        cd gnat-llvm
+        git clone https://git.savannah.gnu.org/git/gcc.git llvm-interface/gcc --single-branch --depth=1
+        ln -s llvm-interface/gcc/gcc/ada llvm-interface/gnat_src
+
+    - name: Clone LLVM Ada bindings
+      shell: msys2 {0}
+      run: |
+        cd gnat-llvm
+        git clone https://github.com/AdaCore/llvm-bindings.git
+
+    - name: Build GNAT LLVM
+      shell: msys2 {0}
+      run: |
+        cd gnat-llvm
+        make
+
+    - name: Test targeting AArch64 Windows MinGW
+      shell: msys2 {0}
+      run: |
+        cd gnat-llvm
+        export PATH=$PWD/llvm-interface/bin:$PATH
+        echo 'procedure Main is begin null; end Main;' > main.adb
+        llvm-gcc -c -emit-llvm -target aarch64-w64-mingw32 main.adb -o main.bc
+        test -f main.bc && test -s main.bc && echo "Target test passed"
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: gnat-llvm-build
+        path: |
+          gnat-llvm/llvm-interface/bin/*
+          gnat-llvm/llvm-interface/lib/*
+        retention-days: 7
