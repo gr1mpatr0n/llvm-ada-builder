@@ -34,7 +34,7 @@ jobs:
       shell: msys2 {0}
       run: |
         cd gnat-llvm
-        git clone https://git.savannah.gnu.org/git/gcc.git llvm-interface/gcc --single-branch --depth=1
+        git clone git://gcc.gnu.org/git/gcc.git llvm-interface/gcc --single-branch --depth=1
         ln -s gcc/gcc/ada llvm-interface/gnat_src
     - name: Clone LLVM Ada bindings
       shell: msys2 {0}
